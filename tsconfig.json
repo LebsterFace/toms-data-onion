@@ -1,0 +1,17 @@
+{
+	"compilerOptions": {
+		"target": "ES2025",
+		"module": "esnext",
+		"types": ["node"],
+		"strict": true,
+		"noImplicitAny": true,
+		"moduleDetection": "force",
+		"verbatimModuleSyntax": true,
+		"isolatedModules": true,
+		"skipLibCheck": true,
+		"noUnusedLocals": true,
+		"inlineSourceMap": true,
+		"allowSyntheticDefaultImports": true
+	},
+	"include": [ "src/*.ts"	]
+}
