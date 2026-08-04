@@ -77,5 +77,6 @@ fn ascii85(input: String) -> Vec<u8> {
 
 fn main() {
     let data = read();
-    fs::write("./parts/1.txt", ascii85(data)).unwrap();
+    let decoded = String::from_utf8(ascii85(data)).unwrap();
+    fs::write("./parts/1.txt", decoded.trim_end()).unwrap();
 }
