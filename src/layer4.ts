@@ -2,18 +2,18 @@ import fs from "node:fs/promises";
 
 const ascii85 = (text: string) => {
 	text = text.replaceAll("z", "!!!!!");
-	const padding = text.length % 5;
+	const padding = (5 - (text.length % 5)) % 5;
 	text += "u".repeat(padding);
 
-	const bytes = new Uint8Array(input.length * 4 / 5);
+	const bytes = new Uint8Array((text.length / 5) * 4);
 	const view = new DataView(bytes.buffer);
 	let number_count = 0;
 
-	for (let i = 0; i < input.length - 5; i += 5) {
-		const chunk = input.slice(i, i + 5);
-		const value = [...chunk].map((c, i) => {
+	for (let i = 0; i < text.length; i += 5) {
+		const chunk = text.slice(i, i + 5);
+		const value = [...chunk].map((c, j) => {
 			const code = c.charCodeAt(0) - '!'.charCodeAt(0);
-			const scale = 85 ** (4 - i);
+			const scale = 85 ** (4 - j);
 			return code * scale;
 		}).reduce((a, b) => a + b);
 
@@ -21,7 +21,7 @@ const ascii85 = (text: string) => {
 		number_count += 4;
 	}
 
-	return bytes.slice(0, -padding);
+	return bytes.slice(0, bytes.length - padding);
 };
 
 let input = await fs.readFile("./parts/4.txt", "utf-8");
@@ -32,9 +32,15 @@ input = input.slice(
 
 class Streamer {
 	private readonly bitstream: Generator<number>;
+	private remaining_bits: number;
 
 	constructor(data: Uint8Array) {
 		this.bitstream = this.stream(data);
+		this.remaining_bits = data.length * 8;
+	}
+
+	get remaining_bytes(): number {
+		return Math.floor(this.remaining_bits / 8);
 	}
 
 	private *stream(array: Uint8Array): Generator<number> {
@@ -57,6 +63,7 @@ class Streamer {
 			}
 
 			result |= next.value;
+			this.remaining_bits--;
 		}
 
 		return result;
@@ -73,44 +80,7 @@ class Streamer {
 	}
 }
 
-
 /*
-0                   1                   2                   3
-0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|Ver= 4 |IHL= 5 |Type of Service|       Total Length = 216      |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|     Identification = 111      |Flg=0|  Fragment Offset  =  32 |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|   Time = 119  | Protocol = 6  |        Header Checksum        |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                         source address                        |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                      destination address                      |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                             data                              |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                             data                              |
-\                                                               \
-\                                                               \
-|                             data                              |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|            data               |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-
-
-0      7 8     15 16    23 24    31
-+--------+--------+--------+--------+
-|     Source      |   Destination   |
-|      Port       |      Port       |
-+--------+--------+--------+--------+
-|                 |                 |
-|     Length      |    Checksum     |
-+--------+--------+--------+--------+
-|
-|          data octets ...
-+---------------- ...
-
 - The packet was sent FROM any port of 10.1.1.10
   - Compare Source to CORRECT_SOURCE 
 - The packet was sent TO port 42069 of 10.1.1.200
@@ -173,26 +143,16 @@ const next_packet = (): Packet => {
 		version: ip_bytes.bits(4),
 		ihl: ip_bytes.bits(4),
 		type_of_service: ip_bytes.bits(8),
-
 		total_length: ip_bytes.bits(16),
-
 		identification: ip_bytes.bits(16),
-
 		flags: ip_bytes.bits(3),
 		fragment_offset: ip_bytes.bits(13),
-
 		ttl: ip_bytes.bits(8),
 		protocol: ip_bytes.bits(8),
-
 		// 80 bits; 5th 16-bit word in the input
 		checksum: ip_bytes.bits(16),
-
 		source: ip_bytes.bits(32),
-
-
 		dest: ip_bytes.bits(32),
-
-
 		bytes: raw_ip_bytes
 	};
 
@@ -221,15 +181,13 @@ const toWords = (bytes: Uint8Array) => {
 };
 
 const checksum = (words: Uint16Array): number => {
-	let sum = 0n;
-	for (const word of words) sum += BigInt(word);
-	const high = sum & 0xf0000n;
-	sum &= 0x0ffffn;
-	sum += (high >> 16n);
-	sum = (~sum) & 0xffffn;
+	let sum = 0;
+	for (const word of words) {
+		sum += word;
+		sum = (sum & 0xffff) + (sum >>> 16);
+	}
 
-	if (!Number.isSafeInteger(Number(sum))) throw new Error("Sum too big for float!");
-	return Number(sum);
+	return (~sum) & 0xffff;
 };
 
 const calculate_ip_checksum = (ip: IPv4Header): number => {
@@ -258,33 +216,17 @@ const calculate_udp_checksum = (packet: Packet): number => {
 	return checksum(toWords(data));
 };
 
-const is_valid = (packet: Packet): boolean => {
-	if (ipAddress(packet.ip.source) !== "10.1.1.10") {
-		return false;
-	}
-
-	if (ipAddress(packet.ip.dest) !== "10.1.1.200") {
-		return false;
-	}
-
-	if (packet.udp.dest_port !== 42069) {
-		return false;
-	}
-
-	if (calculate_ip_checksum(packet.ip) !== packet.ip.checksum) {
-		return false;
-	}
-
-	if (calculate_udp_checksum(packet) !== packet.udp.checksum) {
-		return false;
-	}
-
-	return true;
-};
+const is_valid = (packet: Packet) => (
+	ipAddress(packet.ip.source) === "10.1.1.10" &&
+	ipAddress(packet.ip.dest) === "10.1.1.200" &&
+	packet.udp.dest_port === 42069 &&
+	calculate_ip_checksum(packet.ip) === packet.ip.checksum &&
+	calculate_udp_checksum(packet) === packet.udp.checksum
+);
 
 const decoder = new TextDecoder();
 let result = "";
-for (let i = 0; i < 673; i++) {
+while (response.remaining_bytes > 0) {
 	const packet = next_packet();
 	if (is_valid(packet)) {
 		result += decoder.decode(packet.data);
