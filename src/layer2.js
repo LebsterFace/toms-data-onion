@@ -2,18 +2,18 @@ import fs from "node:fs/promises";
 
 const ascii85 = text => {
 	text = text.replaceAll("z", "!!!!!");
-	const padding = text.length % 5;
+	const padding = (5 - (text.length % 5)) % 5;
 	text += "u".repeat(padding);
 
-	const bytes = new Uint8Array(input.length * 4 / 5);
+	const bytes = new Uint8Array((text.length / 5) * 4);
 	const view = new DataView(bytes.buffer);
 	let number_count = 0;
 
-	for (let i = 0; i < input.length - 5; i += 5) {
-		const chunk = input.slice(i, i + 5);
-		const value = [...chunk].map((c, i) => {
+	for (let i = 0; i < text.length; i += 5) {
+		const chunk = text.slice(i, i + 5);
+		const value = [...chunk].map((c, j) => {
 			const code = c.charCodeAt(0) - '!'.charCodeAt(0);
-			const scale = 85 ** (4 - i);
+			const scale = 85 ** (4 - j);
 			return code * scale;
 		}).reduce((a, b) => a + b);
 
@@ -21,7 +21,7 @@ const ascii85 = text => {
 		number_count += 4;
 	}
 
-	return bytes.slice(0, -padding);
+	return bytes.slice(0, bytes.length - padding);
 };
 
 let input = await fs.readFile("./parts/2.txt", "utf-8");
@@ -55,7 +55,7 @@ function* bits(array) {
 // 01234568 9ABCDE01 ...
 
 
-const result = new Uint8Array(valid_bytes.length * 7 / 8);
+const result = new Uint8Array(Math.floor(valid_bytes.length * 7 / 8));
 let bit_count = 0;
 let byte = 0;
 let byte_count = 0;
@@ -74,4 +74,4 @@ for (const bit of bits(valid_bytes)) {
 	}
 }
 
-await fs.writeFile("./parts/3.txt", Array.from(result, x => String.fromCharCode(x)).join(""));
+await fs.writeFile("./parts/3.txt", Array.from(result, x => String.fromCharCode(x)).join("").trim());

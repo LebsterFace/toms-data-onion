@@ -65,5 +65,5 @@ void main() throws IOException {
 	}
 
 	output.trimToSize();
-	Files.writeString(Path.of("parts/2.txt"), output.toString(), Charset.forName("utf8"));
+	Files.writeString(Path.of("parts/2.txt"), output.toString().trim(), Charset.forName("utf8"));
 }
