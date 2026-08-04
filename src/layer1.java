@@ -1,5 +1,6 @@
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.function.IntBinaryOperator;
 
 String readRawData() {
@@ -15,12 +16,12 @@ String readRawData() {
 
 byte[] ascii85(String input) {
 	input = input.replace("z", "!!!!!");
-	final int padding = input.length() % 5;
+	final int padding = (5 - (input.length() % 5)) % 5;
 	input += "u".repeat(padding);
 
-	final byte[] bytes = new byte[(input.length() * 4) / 5];
+	final byte[] bytes = new byte[(input.length() / 5) * 4];
 	int byte_count = 0;
-	for (int i = 0; i < input.length() - 5; i += 5) {
+	for (int i = 0; i < input.length(); i += 5) {
 		final String chunk = input.substring(i, i + 5);
 		final char[] chars = chunk.toCharArray();
 		long result = ((long) (chars[0] - '!')) * Math.powExact(85, 4) +
@@ -34,7 +35,8 @@ byte[] ascii85(String input) {
 		bytes[byte_count++] = (byte) ((result & 0x000000FFL) >>> (8 * 0));
 	}
 
-	return bytes;
+	// remove padding
+	return Arrays.copyOf(bytes, bytes.length - padding);
 }
 
 
