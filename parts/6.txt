@@ -1,0 +1,575 @@
+==[ Layer 6/6: Virtual Machine ]============================
+
+Every computer has a CPU, and every CPU runs binary
+instruction data called machine code. The format of the
+binary data, or how a CPU interprets the data, is called the
+instruction set architecture (ISA). As of 2020, the ISA of
+the CPU in your desktop computer is probably some variant of
+x86-64.
+
+Let's look at two bytes of example machine code: 0x04 0xAA.
+An x86-64-compatible CPU would read the first byte 0x04 and
+interpret that as an instruction called "ADD AL, imm8". The
+"imm8" part means that this instruction includes the next
+byte too. Executing the instruction, the CPU would read and
+interpret the second byte as an integer, adding it to the
+value in the `AL` register. The result would be the same
+whether these bytes were run on an Intel Core i9 or an AMD
+Ryzen 9, because both of those CPUs are designed to run
+x86-64 machine code.
+
+What if we tried to run the same two bytes of machine code
+on an original Nintendo Gameboy? The Gameboy's CPU is a
+Sharp LR35902, which was custom-made for Nintendo in the
+1980s, and has a unique ISA. This CPU would interpret the
+first byte 0x04 as the "INC B" instruction, which adds one
+to the `B` register. This instruction is only one byte long,
+so the CPU would interpret the second byte as a new
+instruction. The second byte 0xAA is the "XOR D"
+instruction, which updates the `A` register by doing
+a bitwise XOR operation with the `D` register.
+
+As you can see, machine code has wildly different results
+depending on the ISA of the CPU it is executed on.
+
+So what if we want to run a Gameboy game on a modern desktop
+computer? The desktop CPU would not interpret the Gameboy
+machine code correctly, because the ISAs are different. We
+would need some kind of software that is capable of reading
+and executing Sharp LR35902 machine code, but the software
+itself must be compiled for x86-64 in order to run. This is
+what emulators are: software that runs other software by
+acting like "fake" or "virtual" hardware.
+
+Here's another scenario: what if we want to compile software
+so that it can run on all different kinds of CPUs? This was
+one of the original goals of the Java programming language.
+When James Gosling designed the first version of Java, he
+invented a new ISA that we now call Java bytecode. He
+implemented the first Java compiler, which converts Java
+source code into Java bytecode. He also created the first
+Java Virtual Machine (JVM), which is cross-platform software
+that runs Java bytecode, similar to an emulator.
+
+The difference between an emulator and a virtual machine is
+that an emulator is pretending to be something else. The JVM
+was never designed to immitate an existing CPU. In fact, the
+opposite is true -- there are now multiple CPUs designed to
+run Java bytecode directly, immitating the JVM.
+
+The difference between machine code and bytecode is similar.
+Both are binary instruction data, but machine code is
+intended to be run by a real CPU, and bytecode is intended
+to be run by a virtual machine.
+
+    ----------------------------------------------------
+
+After reading the novel above, you might be concerned about
+how complicated this layer is going to be. Don't worry
+though, because I'm actually going to give you all the code
+necessary to decrypt the payload.
+
+The next layer is encrypted using the infamous Dalling
+cipher, which I invented three days ago. It's loosely based
+on AES, but the exact details don't matter. The decryption
+code provided below already works -- you just need to run
+it.
+
+The tricky part is that the provided code is actually
+machine code. If you have a Tomtel Core i69 somewhere around
+the house, you can use that to run the machine code. If you
+don't have one of those, you will need to write an emulator.
+There isn't much information about the ISA online, probably
+because I invented it two days ago, but I have included a
+detailed specification below.
+
+The payload for this layer is bytecode for a program that
+outputs the next layer. Create a virtual machine according
+to the specification below, and use it to run the payload.
+
+
+==[ Spec: Overview ]========================================
+
+The Tomtel Core i69 has:
+
+ - 12 registers (see [ Spec: Registers ])
+ - a fixed amount of memory (see [ Spec: Memory ])
+ - an output stream (see [ Spec: Output ])
+ - 13 distinct instructions (see [ Spec: Instruction Set ])
+
+Its patented Advanced Positivity Technology (tm) means that
+all values are treated as unsigned integers. There is no
+such thing as a negative number on a Tomtel. There is no
+floating point arithmetic either. Why would you want things
+floating in your computer, anyway? For safety purposes,
+Tomtel systems do not contain any liquid.
+
+When running, it does the following in a loop:
+
+ 1. Reads one instruction from memory, at the address stored
+    in the `pc` register.
+
+ 2. Adds the byte size of the instruction to the `pc`
+    register.
+
+ 3. Executes the instruction.
+
+It continues running until it executes a HALT instruction.
+The HALT instruction indicates that the program is finished
+and the output stream is complete.
+
+
+==[ Spec: Example Program ]=================================
+
+Below is the bytecode for an example program, commented with
+the corresponding instructions. You can run this program to
+test your VM.
+
+The bytecode is in hexadecimal, with whitespace between each
+byte. This program outputs the ASCII string "Hello, world!",
+and uses every type of instruction at least once.
+
+    50 48  # MVI b <- 72
+    C2     # ADD a <- b
+    02     # OUT a
+    A8 4D 00 00 00  # MVI32 ptr <- 0x0000004d
+    4F     # MV a <- (ptr+c)
+    02     # OUT a
+    50 09  # MVI b <- 9
+    C4     # XOR a <- b
+    02     # OUT a
+    02     # OUT a
+    E1 01  # APTR 0x00000001
+    4F     # MV a <- (ptr+c)
+    02     # OUT a
+    C1     # CMP
+    22 1D 00 00 00  # JNZ 0x0000001d
+    48 30  # MVI a <- 48
+    02     # OUT a
+    58 03  # MVI c <- 3
+    4F     # MV a <- (ptr+c)
+    02     # OUT a
+    B0 29 00 00 00  # MVI32 pc <- 0x00000029
+    48 31  # MVI a <- 49
+    02     # OUT a
+    50 0C  # MVI b <- 12
+    C3     # SUB a <- b
+    02     # OUT a
+    AA     # MV32 ptr <- lb
+    57     # MV b <- (ptr+c)
+    48 02  # MVI a <- 2
+    C1     # CMP
+    21 3A 00 00 00  # JEZ 0x0000003a
+    48 32  # MVI a <- 50
+    02     # OUT a
+    48 77  # MVI a <- 119
+    02     # OUT a
+    48 6F  # MVI a <- 111
+    02     # OUT a
+    48 72  # MVI a <- 114
+    02     # OUT a
+    48 6C  # MVI a <- 108
+    02     # OUT a
+    48 64  # MVI a <- 100
+    02     # OUT a
+    48 21  # MVI a <- 33
+    02     # OUT a
+    01     # HALT
+    65 6F 33 34 2C  # non-instruction data
+
+
+==[ Spec: Registers ]=======================================
+
+The Tomtel Core i69 is a register machine. It has six 8-bit
+registers and another six 32-bit registers for a total of 12
+registers.
+
+All registers are initialized to zero when the machine
+starts.
+
+All registers hold unsigned integers.
+
+The 8-bit registers are:
+
+    `a`  Accumulation register -- Used to store the result
+         of various instructions.
+
+    `b`  Operand register -- This is 'right hand side' of
+         various operations.
+
+    `c`  Count/offset register -- Holds an offset or index
+         value that is used when reading memory.
+
+    `d`  General purpose register
+
+    `e`  General purpose register
+
+    `f`  Flags register -- Holds the result of the
+         comparison instruction (CMP), and is used by
+         conditional jump instructions (JEZ, JNZ).
+
+The 32-bit registers are:
+
+    `la`   General purpose register
+
+    `lb`   General purpose register
+
+    `lc`   General purpose register
+
+    `ld`   General purpose register
+
+    `ptr`  Pointer to memory -- holds a memory address which
+           is used by instructions that read or write
+           memory.
+
+    `pc`   Program counter -- holds a memory address that
+           points to the next instruction to be executed.
+
+In addition to these 12 registers, there is an 8-bit
+pseudo-register used to read and write memory. This is only
+used by the 8-bit move instructions (MV, MVI).
+
+    `(ptr+c)`  Memory cursor -- Used to access one byte of
+               memory. Using this pseudo-register as the
+               {dst} of a move instruction will write to
+               memory. Using this as the {src} of a move
+               instruction will read from memory. The memory
+               address of the byte to be read/written is the
+               sum of the `ptr` and `c` registers.
+
+
+==[ Spec: Memory ]==========================================
+
+The Tomtel Core i69 has a fixed amount of memory. Whatever
+the size of this layer's payload is, that's how much memory
+is needed.
+
+Memory is mutable. Any byte of memory can be read, written,
+or executed as an instruction.
+
+Output is not stored in memory.
+
+
+==[ Spec: Output ]==========================================
+
+The Tomtel Core i69 produces output, one byte at a time,
+using the OUT instruction. Every time the OUT instruction is
+executed, one byte is appended to the output stream.
+
+Theoretically, there is no limit to how much output can be
+generated, but I can guarantee that the correct output is
+smaller than the size of the payload.
+
+The output is complete when the VM stops due to executing
+the HALT instruction.
+
+
+==[ Spec: Instruction Set ]=================================
+
+Below are the details for every instruction that the Tomtel
+Core i69 supports.
+
+If the VM attempts to execute an instruction that is not
+specified here, then something is wrong with the
+implementation of the VM. There are non-instruction bytes in
+the payload, but the bytecode is written such that they will
+never be executed.
+
+Every instruction has a name that looks like assembly
+language. The parts of the name have the following format:
+
+    ADD, SUB, XOR, ...
+      The type of the instruction is always first, in
+      uppercase.
+
+    a, b, c, ptr, pc, ...
+      Registers are referred to by their name, in lower
+      case.
+
+    <-
+      Arrows indicate that the value on the left is being
+      updated using the value on the right. This is just to
+      help clarify instructions that involve two registers,
+      indicating which register will be changed, and which
+      will not.
+
+    {dest}, {src}
+      Register arguments have curly brackets. These are
+      variables that represent a register/pseudo-register.
+      The meaning and allowed values are explained in the
+      documentation for that specific instruction.
+
+    imm8, imm32
+      Immediate values are represented with "imm" followed
+      by their bit size. These are instruction arguments
+      stored in the bytes immediately following the first
+      byte of the instruction. "imm8" is a one-byte unsigned
+      integer, and "imm32" is a four-byte unsigned integer
+      in little-endian byte order. The documentation for the
+      instruction explains how the immediate arguments are
+      used.
+
+Every instruction specifies its opcode, which is the binary
+format of the instruction, as you will encounter it in the
+payload. The bytes of the opcode are separated by spaces,
+and have one of the following formats:
+
+    0xAA
+      A constant byte value, in hexadecimal format. Most
+      instructions can identified by their unique first
+      byte.
+
+    0x__
+      A placeholder byte for an immediate value. A single
+      one of these represents an 8-bit immediate value. Four
+      of these in a row represents a 32-bit immediate value
+      in little-endian byte order.
+
+    0b11DDDSSS
+      A byte with variable argument bits, in binary format.
+      Bits marked as "0" or "1" are constant, and can be
+      used to identify the instruction. Consecutive bits
+      marked with the same letter, like "DDD", correspond to
+      an argument that is specific to the instruction. Read
+      the instruction documentation for details about how to
+      interpret the arguments.
+
+Without further ado, here are the instructions:
+
+
+--[ ADD a <- b ]--------------------------------------------
+
+  8-bit addition
+  Opcode: 0xC2 (1 byte)
+
+  Sets `a` to the sum of `a` and `b`, modulo 256.
+
+
+--[ APTR imm8 ]---------------------------------------------
+
+  Advance ptr
+  Opcode: 0xE1 0x__ (2 bytes)
+
+  Sets `ptr` to the sum of `ptr` and `imm8`. Overflow
+  behaviour is undefined.
+
+
+--[ CMP ]---------------------------------------------------
+
+  Compare
+  Opcode: 0xC1 (1 byte)
+
+  Sets `f` to zero if `a` and `b` are equal, otherwise sets
+  `f` to 0x01.
+
+
+--[ HALT ]--------------------------------------------------
+
+  Halt execution
+  Opcode: 0x01 (1 byte)
+
+  Stops the execution of the virtual machine. Indicates that
+  the program has finished successfully.
+
+
+--[ JEZ imm32 ]---------------------------------------------
+
+  Jump if equals zero
+  Opcode: 0x21 0x__ 0x__ 0x__ 0x__ (5 bytes)
+
+  If `f` is equal to zero, sets `pc` to `imm32`. Otherwise
+  does nothing.
+
+
+--[ JNZ imm32 ]---------------------------------------------
+
+  Jump if not zero
+  Opcode: 0x22 0x__ 0x__ 0x__ 0x__ (5 bytes)
+
+  If `f` is not equal to zero, sets `pc` to `imm32`.
+  Otherwise does nothing.
+
+
+--[ MV {dest} <- {src} ]------------------------------------
+
+  Move 8-bit value
+  Opcode: 0b01DDDSSS (1 byte)
+
+  Sets `{dest}` to the value of `{src}`.
+
+  Both `{dest}` and `{src}` are 3-bit unsigned integers that
+  correspond to an 8-bit register or pseudo-register. In the
+  opcode format above, the "DDD" bits are `{dest}`, and the
+  "SSS" bits are `{src}`. Below are the possible valid
+  values (in decimal) and their meaning.
+
+                          1 => `a`
+                          2 => `b`
+                          3 => `c`
+                          4 => `d`
+                          5 => `e`
+                          6 => `f`
+                          7 => `(ptr+c)`
+
+  A zero `{src}` indicates an MVI instruction, not MV.
+
+
+--[ MV32 {dest} <- {src} ]----------------------------------
+
+  Move 32-bit value
+  Opcode: 0b10DDDSSS (1 byte)
+
+  Sets `{dest}` to the value of `{src}`.
+
+  Both `{dest}` and `{src}` are 3-bit unsigned integers that
+  correspond to a 32-bit register. In the opcode format
+  above, the "DDD" bits are `{dest}`, and the "SSS" bits are
+  `{src}`. Below are the possible valid values (in decimal)
+  and their meaning.
+
+                          1 => `la`
+                          2 => `lb`
+                          3 => `lc`
+                          4 => `ld`
+                          5 => `ptr`
+                          6 => `pc`
+
+
+--[ MVI {dest} <- imm8 ]------------------------------------
+
+  Move immediate 8-bit value
+  Opcode: 0b01DDD000 0x__ (2 bytes)
+
+  Sets `{dest}` to the value of `imm8`.
+
+  `{dest}` is a 3-bit unsigned integer that corresponds to
+  an 8-bit register or pseudo-register. It is the "DDD" bits
+  in the opcode format above. Below are the possible valid
+  values (in decimal) and their meaning.
+
+                          1 => `a`
+                          2 => `b`
+                          3 => `c`
+                          4 => `d`
+                          5 => `e`
+                          6 => `f`
+                          7 => `(ptr+c)`
+
+
+--[ MVI32 {dest} <- imm32 ]---------------------------------
+
+  Move immediate 32-bit value
+  Opcode: 0b10DDD000 0x__ 0x__ 0x__ 0x__ (5 bytes)
+
+  Sets `{dest}` to the value of `imm32`.
+
+  `{dest}` is a 3-bit unsigned integer that corresponds to a
+  32-bit register. It is the "DDD" bits in the opcode format
+  above. Below are the possible valid values (in decimal)
+  and their meaning.
+
+                          1 => `la`
+                          2 => `lb`
+                          3 => `lc`
+                          4 => `ld`
+                          5 => `ptr`
+                          6 => `pc`
+
+
+--[ OUT a ]-------------------------------------------------
+
+  Output byte
+  Opcode: 0x02 (1 byte)
+
+  Appends the value of `a` to the output stream.
+
+
+--[ SUB a <- b ]--------------------------------------------
+
+  8-bit subtraction
+  Opcode: 0xC3 (1 byte)
+
+  Sets `a` to the result of subtracting `b` from `a`. If
+  subtraction would result in a negative number, 256 is
+  added to ensure that the result is non-negative.
+
+
+--[ XOR a <- b ]--------------------------------------------
+
+  8-bit bitwise exclusive OR
+  Opcode: 0xC4 (1 byte)
+
+  Sets `a` to the bitwise exclusive OR of `a` and `b`.
+
+
+==[ Payload ]===============================================
+
+<~W/goY!0EHS!!&B5!!!"$%umSjWDCHX92GW):]\I:+qakU!4,c.:KRd%=:&
+VB%<#>XGut)n=9X(S$%5nW:KRg&=:/\C%W>GVGutQ&=9<kP#(9SU:KRj'=:8
+bD%rYPTGutH#=:]d]"+?P$$NL0/%uk(+W/D#`!)KS!GtUs6_,(0M=X&"h!!'
+>^QS$@ogf2pb-,X2!!u(JWd10u(`^Kn8<ts\,kGm8``amm=p]k;^/J1[&-N?
+6#O]VfO+[S-l*e9lMbn3+1@IG:WZVO^)C=-`nRo-)[-_kOM.k?tR0Q_QILF&
+lL%#0u=+u!hV1DQ@-%>Nn^FAFLV9OH^\0O>]n?&B,#qZKU?bV84AmoVRVDK*
+N,Ao$+7DkZo&5'/Vi>gTfjBiteJTK6Ob?a"92"8Fq0@n\slB&;D[9oGrN\!u
+3#=X(;rLcV#,o"JD#Uu@LA]D1?Z2`>('mdBg[-dtSVB1'*hP9+DG\7r>[7Pe
+kn@>`2!K^h@iStrq47MBtr>]lLk:=C8KO!*+sk%LNRChnGt$pN!n<,CBA)P@
+pN1;WtGDpZE?J[3GaI=KOmMauWDGCjDNE!H=*5TWFrB_C+qqJ:OMj\1?f["r
+EZUBA09Y4f`@IjW@`*c)'+7Ol[]FAtu,&sJ3/)3Ysg^cZ'Oa*qAH-t%J?i)=
+4f_I$5[C0&+//K&%sQX%\M"KP)@aQ[im&gaUHipDQAGk%RRRNB-Z[0%Qb=g]
+<n+Cr2TP9;LPN%kB;8_A1nl49K6N"k=EfIqil1;%old.:h#<@;6PbGZ4Vjm(
+/.WGB2V@V<ZQ7R*=BjCt--Xmeks3tX=l';-O.b9<F9.;*fM21r;3I[q/W*@k
+G5^"'8u';aTM`(fFlSCd>%)0,_&hsFcT^g[ss<]?o7G&0!?TOh$Xo32sUQ7[
+3-o.q0^;Q7F:!B%oC$fIs6&Bcfq:'6!(nC/#eWr`c>-^N!:7MKn*m]Oh>,a5
+mL]PcqprBGSBPfG&1pAgS.Wf=Tm`c5`R:%,st#6c,.JL^#Nk$$-$I?2nCcF(
+1jT[1B7<"(OZ7#7PY?Cb6CL%MP!MP_<01]a^%KMA#AI$<8GmmJ-!&1gdQ:6&
++Q\$Nq!)%[_N<W&V>eL@Ci<uV!*_./<#h;$mG_iM-Z7Dqb[A@Z:bV=)#])L:
+1QaB[u0[;Zad.O`d*k".tU/[SK^,6LGu=Om;e^nig^4Q5MkTur.j;;Rd+-uu
+2%b(o\cIIY;WfO-Pb6n"SHLM_5%pB0Ce(#I8>!8)r;b=[Op507K-ph%mdUmd
+C73J&M`T7PK#$6U9Gk(h^l)RObr'6((MmC;&JWiO!\N0j<GqHD*0E,63hCEh
+-_4QY:1!X5Aafp0YAEWFf[0.Ejf=b]\gMHqm^]bfa&iSIfJPO#F(>KH2jIBY
+l=kIParGdk0UL$R.Vq4!\c<^=5lFe*W%T2kCn,-&mN5gQE:k.6-W:Le_kQ6*
+E`!C3&'TSaZd"%%S.;%MZ>\WV#sBoWMD.b>(A(m]3&*C/ugQSb\_go_a)i"I
+q'FWb5_b]h(H^:r8'l@$<dP')P"HE8@&/cB\:Q.E"[`:bimKDK"YfOdR/c=&
+L1J/t@82c+IfC7Xona>jTZ&=QGnHC`8?bHG1?F;q(3>V1)WdTDHU8tIbKr:,
+o5HMli^!=*o/5Cm["REG<]_umk)V%O5,^B/!k3PTo6m0uToVo3oQZ2dgrEc#
+]'HGS)I5mc%kLhkuQ`1I@;bNs%BoJ+1d!YoCkI;JM$N^*=$Od&hC,)pL5'sQ
+ID$Fb^s"U[m*&!`rkL]I=uU4s\(Z/t-40;'`H,\ljFaE,B++GTq\7j*&MDCu
+T3h%X]0aFP2h8VD0KZkR$RN^utYSV3&rfRYMX]#a\Kbo$!8Y(q$TGs(l_Cp@
+8WlqGECa\pUPS4Xc9S\K>OPr%s;`FZ<\4DrCDVWG%efgnL*J-"\h\Q+3PTfD
+pbA*K":n*@p04Ntq4k-4O"*!\'Tfj09D7Yt_lgAjhtIYf5;YoYrgm`+SYhZX
+fjCd0-RZ%.aT7?X7fj!A2g5)=+q&TM-=&Wn>75Zg`KNiR1UUg^l#1`s\2L^j
+*BXq#'rZ!*Q/\-_UVDCk5/kJpA><#oER["O_ENH%b12dPs2ngVWFLS<0sjb:
+U55-W#YquHVWnCqOmk?HJ8&$XTf))Vq)RN-O?S6+u3c7RYDjOk>mQLQI(#rc
+=*$>J_^eik<^::,\\U+=4&')0RhmOqT&(aFmb/:O2)G]H..Q>8UdSYi5BK91
+.1[@:NEZ@@T7`^S\9i4Ye"UNB]>HIPNCVS]M-M2;SJ;>%="lYXR,V<KX>Xm>
+SArLHu`_g=c\LP!_?/d%V@)J=m:ju'"5Cc<7(p%L4$Te6E[Af]la;`A2[R[@
+,,?/Ys!eqYQ<:&A92jipb>-1.=JY4Dm/<(8t(X'PO*6Ke7=RKE/m^dC#XqJg
+(mVAKHq=T]>81Y',$DE=26UNQ=gX$fb:0kHmCK1TZ/A^WF;*@[s.GOml?6-"
+VEO/qcVDA0hX-P7koE*"j,G<dR\]t&:-/IT)rV-+i9+>mj^*/<*sU0-B=U]m
+*Zn:;Og$CiXDKh/Hs*+0`gD@ICLEUcB]m,70hoJOs4$QH\KBlQot$0<J#@n7
+_ST'5#>hGQsnh0F2hLGXB?g&(Ba&,$g+:&*"C:VWh6FIu@'f/J>j.i>YAeT(
+0DWJ+f!043d+WRL"SGSS;2c?AF*BrQCW^aT>1om4s!ne+mA$qOg;UI/ud3G#
+R\RHZuh'Nh0ts$GZjcLYk_Gf-hf9e`ab/Qc"C>V2qP,q5On4fC:UjSld?\%]
+likhM]I%&RD4G\`Sf;ueg])f+F!1XUdcG.I.\Vbl#HQD^*&6?#Sp15,"J':M
+B*Wc^I`[KfO9,W\G$o+oY?gHEU]m=^J._\lTsBNJDH,+jB%1lCn&C;uVVBOA
+d+KjDk<F=.A1`%m'Ln_L2E;g1;=rLl@?Fq<VnAoV*r%[O&e7AiH8aK:Q*ap`
+K:8P$3pOMj[Zrnf=G!R,)r/]?6H.hJ89o.k@ODAF)h'-Gmf_K*-6OfWm"S"`
+oYUFuUj##X.78C7!9qHEGp#J$R)c&88h3cFKEb7c?U5klO"V2jMG71PS;RK>
+PrO'\h;038`AftXko;#8I5r3HKS'Y.[4C4)6uHJ9%r$.iqEhaVtK!4J;Bqpr
++j5=87S9!Tb284aEZ,BF5:nhFf2>LqIWQ><g8LD?qnClkYY^nVAS2=_7:_]c
+'Bj#*)Z;3DPuo`bmBQ,,Z!6`$rH#7ghe2,X=rMFO`-/>7L`@38Db&ddS<ACd
+hmnlVdeITP)J[d"2[YQS*ufZ]\HLDpRV2"O6U'9seVMD\,tKOVR7\Et9$\i5
+NPf>W(e.'mOCjR+(XRs)O5Cr?QSHn"@Pn7!qr7*Mmf5@fFq(pW4$IFSa"Pn'
+#cCEhP)h"4%k!D0/]E,;E!]r>%a<Ih7j/4^p)\9]#/Zo%YdkAdFCh6iX<lo]
+6L;U,hi>;p0VjKU%:]Y*jtNXRhWWl7:J!L]uF6S5b0#3A'icZPlYI<3f`0Z9
+,!9J7tL)AeVLAn("d)S:0e^oRoCpJ.!m\qiq=]c%FNh2rkCZNF=Y68(A@f;*
+97b6_I!&X3E0Psg;7UIUm:[-l8.0\8P&#d;uFNm6.%mEas8GV(N1Gr(iGMGV
+,k!)HDk_',oh!!#gr_I6OI:BF0c!Q%u=_'2\`!!&:_PmdWm=9iJ0%o^AKDgY
+(d;o;ad92GW):]\I:,%_2_!18ZQ!!'56!!!"\.IP=.n"Rbb-@H]'iDG)\"9J
+%D;E&Za\Sh@1K4ZCrE4UmpNDF`AS?sjijN>?c)=*RDVg"c/]:"+dnr%!Oj`h
+:7L6T]s<gMr#lIW#:W%\uZfjate+]G'HO5!<J?_0f*^A8"b3(_K+>,,)"jrI
+/qJ/.u;a%eb?!nn8T$fc"m,1D`g_mVjEim,>)WXh/d6c!=*4'*^.20&?eKeE
+a/,I0,Ta;FD\OW&mf1p`?6"0lF?psE66$6\q0@!WgNm,s>USTL\:fR(,:No(
+9r&G672pKYsI/j_$,QY\B7VQd+-ga@@q5.laXhR.`dFZC,KXVAMk#X-b+V$m
+>(Y]BdE!2_1WI/kH"\2$oESEQ92-*#o8YQY",!!*~>
+
