@@ -6,6 +6,7 @@ import (
 	"crypto/cipher"
 	"encoding/ascii85"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 )
@@ -60,103 +61,61 @@ func aesKeyUnwrap(kek, iv, wrapped []byte) ([]byte, error) {
 	return out, nil
 }
 
-type Payload struct {
-	// First 32 bytes: The 256-bit key encrypting key (KEK).
-	kek [32]byte
-	// Next 8 bytes: The 64-bit initialization vector (IV) for the wrapped key.
-	kiv [8]byte
-	// Next 40 bytes: The wrapped (encrypted) key. When decrypted, this will become the 256-bit encryption key.
-	key [40]byte
-	// Next 16 bytes: The 128-bit initialization vector (IV) for the encrypted payload.
-	iv [16]byte
-	// All remaining bytes: The encrypted payload.
-	payload []byte
-}
-
 const (
+	// First 32 bytes: The 256-bit key encrypting key (KEK).
 	kekLen    = 32
+	// Next 8 bytes: The 64-bit initialization vector (IV) for the wrapped key.
 	kivLen    = 8
+	// Next 40 bytes: The wrapped (encrypted) key. When decrypted, this will become the 256-bit encryption key.
 	keyLen    = 40
+	// Next 16 bytes: The 128-bit initialization vector (IV) for the encrypted payload.
 	ivLen     = 16
+	// All remaining bytes: The encrypted payload.
 	headerLen = kekLen + kivLen + keyLen + ivLen
 )
 
-func newPayload(input []byte) *Payload {
-	p := &Payload{
-		payload: input[headerLen:],
-	}
-
-	copy(p.kek[:], input[:kekLen])
-	copy(p.kiv[:], input[kekLen:kekLen+kivLen])
-	copy(p.key[:], input[kekLen+kivLen:kekLen+kivLen+keyLen])
-	copy(p.iv[:], input[kekLen+kivLen+keyLen:headerLen])
-
-	return p
-}
-
 func readInput() []byte {
 	b, err := os.ReadFile("./parts/5.txt")
-	if err != nil {
-		fmt.Println("Could not read input: ")
-		fmt.Print(err)
-		os.Exit(1)
-	}
-
+	if err != nil { log.Fatalf("could not read input: %v", err) }
 	contents := string(b)
 
 	_, contents, found := strings.Cut(contents, "<~")
-	if !found {
-		fmt.Println("Could not find prefix <~")
-		os.Exit(1)
-	}
-
+	if !found { log.Fatal("could not find prefix <~") }
 	contents, _, found = strings.CutLast(contents, "~>")
-	if !found {
-		fmt.Println("Could not find suffix ~>")
-		os.Exit(1)
-	}
+	if !found { log.Fatal("could not find suffix ~>") }
 
 	return []byte(contents)
 }
 
 func decode(rawData []byte) []byte {
 	dest := make([]byte, len(rawData))
+
 	ndst, nsrc, err := ascii85.Decode(dest, rawData, true)
-	if err != nil {
-		fmt.Println("Error when decoding ASCII85: ")
-		fmt.Print(err)
-		os.Exit(1)
-	}
+	if err != nil { log.Fatalf("ascii85 decode: %v", err) }
+	if nsrc != len(rawData) { log.Fatalf("ascii85 decode: read %d of %d bytes", nsrc, len(rawData)) }
 
-	if nsrc != len(rawData) {
-		fmt.Println("Error when decoding ASCII85: did not read all bytes")
-		os.Exit(1)
-	}
-
-	dest = dest[:ndst]
-	return dest
+	return dest[:ndst]
 }
 
 func main() {
 	rawData := readInput()
 	decoded := decode(rawData)
-	payload := newPayload(decoded)
 
-	key, err := aesKeyUnwrap(payload.kek[:], payload.kiv[:], payload.key[:])
-	if err != nil {
-		fmt.Println("Error unwrapping key:", err)
-		os.Exit(1)
-	}
+	kek := decoded[:kekLen]
+	kiv := decoded[kekLen : kekLen+kivLen]
+	wrappedKey := decoded[kekLen+kivLen : kekLen+kivLen+keyLen]
+	iv := decoded[kekLen+kivLen+keyLen : headerLen]
+	payload := decoded[headerLen:]
+
+	key, err := aesKeyUnwrap(kek, kiv, wrappedKey)
+	if err != nil { log.Fatalf("unwrapping key: %v", err) }
 
 	block, err := aes.NewCipher(key)
-	if err != nil {
-		fmt.Println("Error when creating cipher:", err)
-		os.Exit(1)
-	}
+	if err != nil { log.Fatalf("creating cipher: %v", err) }
 
-	stream := cipher.NewCTR(block, payload.iv[:])
+	stream := cipher.NewCTR(block, iv)
+	dest := make([]byte, len(payload))
+	stream.XORKeyStream(dest, payload)
 
-	dest := make([]byte, len(payload.payload))
-	stream.XORKeyStream(dest, payload.payload)
-	os.WriteFile("parts/6.txt", dest, 0644)
+	if err := os.WriteFile("parts/6.txt", dest, 0644); err != nil { log.Fatalf("writing output: %v", err) }
 }
