@@ -40,7 +40,6 @@ known(1494, "ission")
 
 display_key = " ".join(f"{c:02x}" for c in key)
 CORRECT = "6c 24 84 8e 42 19 a8 e1 c5 db 57 65 b9 c6 14 9e a5 19 35 96 3b 39 7f a5 65 d1 fe 01 85 7d d9 4c"
-print("KEY =   ", display_key)
 if display_key != CORRECT:
     print("CORRECT:", CORRECT)
 

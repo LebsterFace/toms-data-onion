@@ -11,7 +11,6 @@ import (
 	"strings"
 )
 
-// Authored by Claude; human implementation tbc.
 func aesKeyUnwrap(kek, iv, wrapped []byte) ([]byte, error) {
 	if len(wrapped)%8 != 0 || len(wrapped) < 16 {
 		return nil, fmt.Errorf("invalid wrapped key length")
