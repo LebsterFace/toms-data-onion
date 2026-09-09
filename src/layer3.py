@@ -4,10 +4,8 @@ import itertools as it
 
 PAYLOAD_HEADER = "==[ Payload ]==============================================="
 
-
 def ascii85(text):
     return a85decode(text, adobe=True)
-
 
 text = Path("parts/3.txt").read_text().replace("\r", "").replace("\n", "")
 start = text.find("<~", text.find(PAYLOAD_HEADER))
